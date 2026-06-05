@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>經典梗圖記憶翻牌遊戲</title>
+    <style>
+        :root {
+            --primary-color: #ffd700;
+            --bg-color: #121214;
+            --card-back: #2a2d34;
+            --card-border: #4e54c8;
+        }
+
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: #ffffff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: var(--primary-color);
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+
+        /* 資訊看板 */
+        .info-board {
+            display: flex;
+            gap: 30px;
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px 30px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .info-board span {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        /* 4x4 遊戲網格 */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            width: 440px;
+            height: 440px;
+            perspective: 1000px; /* 3D 翻轉視角空間 */
+        }
+
+        /* 卡牌基礎樣式 */
+        .card {
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* 點擊翻開狀態 */
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        /* 配對成功狀態：保持翻開且無法再點擊 */
+        .card.matched {
+            transform: rotateY(180deg);
+            cursor: default;
+            pointer-events: none; /* 禁用點擊 */
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+        }
+
+        /* 卡牌正反面通用 */
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* 翻面時隱藏另一面 */
+            border-radius: 12px;
+            box-sizing: border-box;
+        }
+
+        /* 卡牌背面（未翻開時，採用幾何撲克牌風背紋） */
+        .card-back {
+            background-color: var(--card-back);
+            border: 3px solid var(--card-border);
+            background-image: linear-gradient(45deg, #323641 25%, transparent 25%), 
+                              linear-gradient(-45deg, #323641 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #323641 75%), 
+                              linear-gradient(-45deg, transparent 75%, #323641 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        }
+
+        /* 卡牌正面（顯示梗圖） */
+        .card-front {
+            background-color: #ffffff;
+            transform: rotateY(180deg);
+            border: 3px solid #ffffff;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-front img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 讓梗圖填滿並維持原有比例不變形 */
+        }
+
+        /* 獲勝彈窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .modal-content {
+            background: #1e1e24;
+            padding: 35px 50px;
+            border-radius: 20px;
+            text-align: center;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+        }
+
+        @keyframes popUp {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+            padding: 12px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #fff;
+            transform: scale(1.05);
+        }
+
+        /* 手機板響應式微調 */
+        @media (max-width: 480px) {
+            .game-grid {
+                width: 90vw;
+                height: 90vw;
+                gap: 8px;
+            }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>迷因記憶翻牌挑戰</h1>
+    <div class="subtitle">請將 .html 檔與 8 張梗圖圖檔放在同一個資料夾下遊玩</div>
+
+    <div class="info-board">
+        <div>翻牌次數: <span id="clicks">0</span></div>
+        <div>已配對組數: <span id="progress">0 / 8</span></div>
+    </div>
+
+    <div class="game-grid" id="gameGrid">
+        </div>
+
+    <div class="modal" id="winModal">
+        <div class="modal-content">
+            <h2>🎉 恭喜通關！地表最強記憶力！ 🎉</h2>
+            <p>你總共點擊了 <span id="final-clicks" style="color:var(--primary-color); font-weight:bold;">0</span> 次翻牌。</p>
+            <button class="btn" onclick="restartGame()">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        // 你提供的 8 張指定梗圖檔案名稱與副檔名
+        const memeImages = [
+            '巴巴博一.jpg',
+            '八嘎呀路.webp',
+            '比比拉布.jpg',
+            '你好我吃一口.jpg',
+            '屁眼狗.jpg',
+            '希特勒貓.jpg',
+            '我的刀盾.jpg',
+            '啵啵貓.png'
+        ];
+
+        // 複製一份，合併成共 16 張牌（兩兩一組）
+        let cardsData = [...memeImages, ...memeImages];
+
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let clickCount = 0;
+        let isLockBoard = false; // 防呆鎖定，避免玩家在兩張牌動畫尚未翻回時點擊第 3 張牌
+
+        const gameGrid = document.getElementById('gameGrid');
+        const clicksDisplay = document.getElementById('clicks');
+        const progressDisplay = document.getElementById('progress');
+        const winModal = document.getElementById('winModal');
+
+        // Fisher-Yates 隨機洗牌演算法
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 初始化/重置網頁遊戲畫面
+        function initGame() {
+            gameGrid.innerHTML = ''; // 清空先前的網格內容
+            shuffle(cardsData);      // 打亂卡牌順序
+
+            // 動態產生 16 張卡牌 HTML 元件
+            cardsData.forEach((fileName) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.memeName = fileName; // 用 Dataset 標記梗圖名稱做後續配對
+
+                // 注入正反面 HTML (並加入內建預防圖片路徑錯誤的破圖替代顯示)
+                card.innerHTML = `
+                    <div class="card-back"></div>
+                    <div class="card-front">
+                        <img src="${fileName}" alt="Meme" onerror="this.parentNode.innerHTML='<span style=\'color:#333;font-weight:bold;font-size:12px;text-align:center;\'>圖檔丟失<br>(${fileName})</span>'">
+                    </div>
+                `;
+
+                card.addEventListener('click', flipCard);
+                gameGrid.appendChild(card);
+            });
+
+            // 數據歸零重設
+            clickCount = 0;
+            matchedPairs = 0;
+            flippedCards = [];
+            isLockBoard = false;
+            clicksDisplay.innerText = clickCount;
+            progressDisplay.innerText = `${matchedPairs} / 8`;
+        }
+
+        // 處理翻牌點擊動作
+        function flipCard() {
+            if (isLockBoard) return; 
+            if (this === flippedCards[0]) return; // 避免重覆點擊同一張已經翻開的牌
+
+            this.classList.add('flipped');
+            flippedCards.push(this);
+            
+            clickCount++;
+            clicksDisplay.innerText = clickCount;
+
+            // 當玩家翻開兩張牌時，進入配對驗證
+            if (flippedCards.length === 2) {
+                checkMatch();
+            }
+        }
+
+        // 檢查兩張翻開的卡牌是否一致
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            const isMatch = card1.dataset.memeName === card2.dataset.memeName;
+
+            if (isMatch) {
+                // 【核心要求】配對成功：兩張牌套用 matched 屬性固定在正面，不翻回去、不可再點擊
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                
+                matchedPairs++;
+                progressDisplay.innerText = `${matchedPairs} / 8`;
+                flippedCards = []; // 清空當前暫存
+
+                // 檢查是否已成功配對全部 8 組
+                if (matchedPairs === 8) {
+                    setTimeout(showWinModal, 600);
+                }
+            } else {
+                // 【核心要求】配對失敗：板面鎖定，並在短暫延遲 1 秒後自動翻回到背面
+                isLockBoard = true;
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    flippedCards = [];
+                    isLockBoard = false; // 解除防呆鎖定
+                }, 1000); 
+            }
+        }
+
+        // 跳出通關結算視窗
+        function showWinModal() {
+            document.getElementById('final-clicks').innerText = clickCount;
+            winModal.style.display = 'flex';
+        }
+
+        // 點選再玩一次重置
+        function restartGame() {
+            winModal.style.display = 'none';
+            initGame();
+        }
+
+        // 網頁載入完成後即刻執行
+        window.onload = initGame;
+    </script>
+</body>
+</html>
